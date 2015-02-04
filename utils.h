@@ -16,12 +16,14 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef _UTILS_H
-#define _UTILS_H
+#ifndef CMUS_UTILS_H
+#define CMUS_UTILS_H
 
 #ifdef HAVE_CONFIG
 #include "config/utils.h"
 #endif
+
+#include "compiler.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -34,12 +36,20 @@
 #include <byteswap.h>
 #endif
 
+
 #define N_ELEMENTS(array) (sizeof(array) / sizeof((array)[0]))
 
 #define STRINGIZE_HELPER(x) #x
 #define STRINGIZE(x) STRINGIZE_HELPER(x)
 
+#define CONCATENATE_HELPER(x,y) x##y
+#define CONCATENATE(x,y) CONCATENATE_HELPER(x,y)
+
 #define getentry(ptr, offset, type) (*((type *) ((void *) ((char *) (ptr) + (offset)))))
+
+#define STATIC_ASSERT(cond) \
+	static uint8_t CONCATENATE(_cmus_unused_, __LINE__)[2*(cond) - 1] UNUSED
+
 
 static inline int min(int a, int b)
 {

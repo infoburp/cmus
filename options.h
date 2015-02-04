@@ -16,12 +16,12 @@
  * along with this program; if not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef OPTIONS_H
-#define OPTIONS_H
+#ifndef CMUS_OPTIONS_H
+#define CMUS_OPTIONS_H
 
 #include "list.h"
 
-#define OPTION_MAX_SIZE	256
+#define OPTION_MAX_SIZE	4096
 
 typedef void (*opt_get_cb)(unsigned int id, char *buf);
 typedef void (*opt_set_cb)(unsigned int id, const char *buf);
@@ -139,6 +139,7 @@ extern int smart_artist_sort;
 extern int scroll_offset;
 extern int rewind_offset;
 extern int skip_track_info;
+extern int mouse;
 
 extern const char * const aaa_mode_names[];
 extern const char * const view_names[NR_VIEWS + 1];
@@ -146,7 +147,12 @@ extern const char * const view_names[NR_VIEWS + 1];
 extern int colors[NR_COLORS];
 extern int attrs[NR_ATTRS];
 
+/* format string for tree window (tree view) */
+extern char *tree_win_format;
+extern char *tree_win_artist_format;
+
 /* format string for track window (tree view) */
+extern char *track_win_album_format;
 extern char *track_win_format;
 extern char *track_win_format_va;
 extern char *track_win_alt_format;
@@ -159,6 +165,9 @@ extern char *list_win_alt_format;
 /* format string for currently playing track */
 extern char *current_format;
 extern char *current_alt_format;
+
+/* format string for status line */
+extern char *statusline_format;
 
 /* format string for window title */
 extern char *window_title_format;
@@ -186,7 +195,10 @@ void resume_exit(void);
 void option_add(const char *name, unsigned int id, opt_get_cb get,
 		opt_set_cb set, opt_toggle_cb toggle, unsigned int flags);
 struct cmus_opt *option_find(const char *name);
+struct cmus_opt *option_find_silent(const char *name);
 void option_set(const char *name, const char *value);
 int parse_enum(const char *buf, int minval, int maxval, const char * const names[], int *val);
+
+void update_mouse(void);
 
 #endif

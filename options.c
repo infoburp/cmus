@@ -79,6 +79,7 @@ int rewind_offset = 5;
 int skip_track_info = 0;
 int auto_expand_albums = 1;
 int show_all_tracks = 1;
+int mouse = 0;
 
 int colors[NR_COLORS] = {
 	-1,
@@ -124,6 +125,9 @@ int attrs[NR_ATTRS] = {
 };
 
 /* uninitialized option variables */
+char *tree_win_format = NULL;
+char *tree_win_artist_format = NULL;
+char *track_win_album_format = NULL;
 char *track_win_format = NULL;
 char *track_win_format_va = NULL;
 char *track_win_alt_format = NULL;
@@ -132,6 +136,7 @@ char *list_win_format_va = NULL;
 char *list_win_alt_format = NULL;
 char *current_format = NULL;
 char *current_alt_format = NULL;
+char *statusline_format = NULL;
 char *window_title_format = NULL;
 char *window_title_alt_format = NULL;
 char *id3_default_charset = NULL;
@@ -190,14 +195,18 @@ static int parse_bool(const char *buf, int *val)
 enum format_id {
 	FMT_CURRENT,
 	FMT_CURRENT_ALT,
+	FMT_STATUSLINE,
 	FMT_PLAYLIST,
 	FMT_PLAYLIST_ALT,
 	FMT_PLAYLIST_VA,
 	FMT_TITLE,
 	FMT_TITLE_ALT,
 	FMT_TRACKWIN,
+	FMT_TRACKWIN_ALBUM,
 	FMT_TRACKWIN_ALT,
 	FMT_TRACKWIN_VA,
+	FMT_TREEWIN,
+	FMT_TREEWIN_ARTIST,
 
 	NR_FMTS
 };
@@ -208,20 +217,33 @@ static const struct {
 	const char *name;
 	const char *value;
 } str_defaults[] = {
-	[FMT_CURRENT_ALT]	= { "altformat_current"	, " %F "				},
-	[FMT_CURRENT]		= { "format_current"	, " %a - %l -%3n. %t%= %y "		},
-	[FMT_PLAYLIST_ALT]	= { "altformat_playlist", " %f%= %d "				},
-	[FMT_PLAYLIST]		= { "format_playlist"	, " %-25%a %3n. %t%= %y %d "		},
-	[FMT_PLAYLIST_VA]	= { "format_playlist_va", " %-25%A %3n. %t (%a)%= %y %d "	},
-	[FMT_TITLE_ALT]		= { "altformat_title"	, "%f"					},
-	[FMT_TITLE]		= { "format_title"	, "%a - %l - %t (%y)"			},
-	[FMT_TRACKWIN_ALT]	= { "altformat_trackwin", " %f%= %d "				},
-	[FMT_TRACKWIN]		= { "format_trackwin"	, "%3n. %t%= %y %d "			},
-	[FMT_TRACKWIN_VA]	= { "format_trackwin_va", "%3n. %t (%a)%= %y %d "		},
+	[FMT_CURRENT_ALT]	= { "altformat_current"		, " %F "						},
+	[FMT_CURRENT]		= { "format_current"		, " %a - %l -%3n. %t%= %y "				},
+	[FMT_STATUSLINE]	= { "format_statusline"		,
+		" %{status} %{?show_playback_position?%{position} %{?duration?/ %{duration} }?%{?duration?%{duration} }}"
+		"- %{total} "
+		"%{?volume>=0?vol: %{?lvolume!=rvolume?%{lvolume},%{rvolume} ?%{volume} }}"
+		"%{?stream?buf: %{buffer} }"
+		"%{?show_current_bitrate & bitrate>=0? %{bitrate} kbps }"
+		"%="
+		"%{?repeat_current?repeat current?%{?play_library?%{playlist_mode} from %{?play_sorted?sorted }library?playlist}}"
+		" | %1{continue}%1{follow}%1{repeat}%1{shuffle} "
+	},
+	[FMT_PLAYLIST_ALT]	= { "altformat_playlist"	, " %f%= %d "						},
+	[FMT_PLAYLIST]		= { "format_playlist"		, " %-21%a %3n. %t%= %y %d %{?X!=0?%3X ?    }"		},
+	[FMT_PLAYLIST_VA]	= { "format_playlist_va"	, " %-21%A %3n. %t (%a)%= %y %d %{?X!=0?%3X ?    }"	},
+	[FMT_TITLE_ALT]		= { "altformat_title"		, "%f"							},
+	[FMT_TITLE]		= { "format_title"		, "%a - %l - %t (%y)"					},
+	[FMT_TRACKWIN_ALBUM]	= { "format_trackwin_album"	, " %l "						},
+	[FMT_TRACKWIN_ALT]	= { "altformat_trackwin"	, " %f%= %d "						},
+	[FMT_TRACKWIN]		= { "format_trackwin"		, "%3n. %t%= %y %d "					},
+	[FMT_TRACKWIN_VA]	= { "format_trackwin_va"	, "%3n. %t (%a)%= %y %d "				},
+	[FMT_TREEWIN]		= { "format_treewin"		, "  %l"						},
+	[FMT_TREEWIN_ARTIST]	= { "format_treewin_artist"	, "%a"							},
 
 	[NR_FMTS] =
 
-	{ "lib_sort", "albumartist date album discnumber tracknumber title filename" },
+	{ "lib_sort", "albumartist date album discnumber tracknumber title filename play_count" },
 	{ "pl_sort", "" },
 	{ "id3_default_charset", "ISO-8859-1" },
 	{ "icecast_default_charset", "ISO-8859-1" },
@@ -310,6 +332,7 @@ static const struct {
 	{ "artist",		SORT_ARTIST		},
 	{ "album",		SORT_ALBUM		},
 	{ "title",		SORT_TITLE		},
+	{ "play_count",		SORT_PLAY_COUNT		},
 	{ "tracknumber",	SORT_TRACKNUMBER	},
 	{ "discnumber",		SORT_DISCNUMBER		},
 	{ "date",		SORT_DATE		},
@@ -330,6 +353,7 @@ static const struct {
 	{ "-artist",		REV_SORT_ARTIST		},
 	{ "-album",		REV_SORT_ALBUM		},
 	{ "-title",		REV_SORT_TITLE		},
+	{ "-play_count", 	REV_SORT_PLAY_COUNT	},
 	{ "-tracknumber",	REV_SORT_TRACKNUMBER	},
 	{ "-discnumber",	REV_SORT_DISCNUMBER	},
 	{ "-date",		REV_SORT_DATE		},
@@ -1074,6 +1098,44 @@ static void toggle_skip_track_info(unsigned int id)
 	skip_track_info ^= 1;
 }
 
+void update_mouse(void)
+{
+	if (mouse) {
+		mouseinterval(25);
+		mousemask(BUTTON_CTRL | BUTTON_ALT
+		  | BUTTON1_PRESSED | BUTTON1_RELEASED | BUTTON1_CLICKED
+		  | BUTTON1_DOUBLE_CLICKED | BUTTON1_TRIPLE_CLICKED
+		  | BUTTON2_PRESSED | BUTTON2_RELEASED | BUTTON2_CLICKED
+		  | BUTTON3_PRESSED | BUTTON3_RELEASED | BUTTON3_CLICKED
+		  | BUTTON3_DOUBLE_CLICKED | BUTTON3_TRIPLE_CLICKED
+		  | BUTTON4_PRESSED | BUTTON4_RELEASED | BUTTON4_CLICKED
+		  | BUTTON4_DOUBLE_CLICKED | BUTTON4_TRIPLE_CLICKED
+#if NCURSES_MOUSE_VERSION >= 2
+		  | BUTTON5_PRESSED | BUTTON5_RELEASED | BUTTON5_CLICKED
+		  | BUTTON5_DOUBLE_CLICKED | BUTTON5_TRIPLE_CLICKED
+#endif
+		  , NULL);
+	} else {
+		mousemask(0, NULL);
+	}
+}
+
+static void get_mouse(unsigned int id, char *buf)
+{
+	strcpy(buf, bool_names[mouse]);
+}
+
+static void set_mouse(unsigned int id, const char *buf)
+{
+	parse_bool(buf, &mouse);
+	update_mouse();
+}
+
+static void toggle_mouse(unsigned int id)
+{
+	mouse ^= 1;
+	update_mouse();
+}
 
 /* }}} */
 
@@ -1198,8 +1260,16 @@ static char **id_to_fmt(enum format_id id)
 		return &window_title_format;
 	case FMT_TRACKWIN:
 		return &track_win_format;
+	case FMT_TRACKWIN_ALBUM:
+		return &track_win_album_format;
 	case FMT_TRACKWIN_VA:
 		return &track_win_format_va;
+	case FMT_TREEWIN:
+		return &tree_win_format;
+	case FMT_TREEWIN_ARTIST:
+		return &tree_win_artist_format;
+	case FMT_STATUSLINE:
+		return &statusline_format;
 	default:
 		die("unhandled format code: %d\n", id);
 	}
@@ -1278,6 +1348,7 @@ static const struct {
 	DN_FLAGS(status_display_program, OPT_PROGRAM_PATH)
 	DT(wrap_search)
 	DT(skip_track_info)
+	DT(mouse)
 	{ NULL, NULL, NULL, NULL, 0 }
 };
 
@@ -1351,13 +1422,20 @@ void option_add(const char *name, unsigned int id, opt_get_cb get,
 
 struct cmus_opt *option_find(const char *name)
 {
+	struct cmus_opt *opt = option_find_silent(name);
+	if (opt == NULL)
+		error_msg("no such option %s", name);
+	return opt;
+}
+
+struct cmus_opt *option_find_silent(const char *name)
+{
 	struct cmus_opt *opt;
 
 	list_for_each_entry(opt, &option_head, node) {
 		if (strcmp(name, opt->name) == 0)
 			return opt;
 	}
-	error_msg("no such option %s", name);
 	return NULL;
 }
 

@@ -7,7 +7,7 @@ _ver1	= $(shell git describe --tags $(REV) 2>/dev/null)
 # SHA1
 _ver2	= $(shell git rev-parse --verify --short $(REV) 2>/dev/null)
 # hand-made
-_ver3	= v2.6.0-rc0
+_ver3	= v2.6.0
 
 VERSION	= $(or $(_ver0),$(_ver1),$(_ver2),$(_ver3))
 
@@ -84,6 +84,7 @@ mp4-objs		:= mp4.lo
 aac-objs		:= aac.lo
 ffmpeg-objs		:= ffmpeg.lo
 cue-objs		:= cue.lo
+vtx-objs		:= vtx.lo
 
 ip-$(CONFIG_CDIO)	+= cdio.so
 ip-$(CONFIG_FLAC)	+= flac.so
@@ -99,6 +100,7 @@ ip-$(CONFIG_MP4)	+= mp4.so
 ip-$(CONFIG_AAC)	+= aac.so
 ip-$(CONFIG_FFMPEG)	+= ffmpeg.so
 ip-$(CONFIG_CUE)	+= cue.so
+ip-$(CONFIG_VTX)	+= vtx.so
 
 $(cdio-objs):		CFLAGS += $(CDIO_CFLAGS) $(CDDB_CFLAGS)
 $(flac-objs):		CFLAGS += $(FLAC_CFLAGS)
@@ -113,6 +115,7 @@ $(mp4-objs):		CFLAGS += $(MP4_CFLAGS)
 $(aac-objs):		CFLAGS += $(AAC_CFLAGS)
 $(ffmpeg-objs):		CFLAGS += $(FFMPEG_CFLAGS)
 $(cue-objs):		CFLAGS += $(CUE_CFLAGS)
+$(vtx-objs):		CFLAGS += $(VTX_CFLAGS)
 
 cdio.so: $(cdio-objs) $(libcmus-y)
 	$(call cmd,ld_dl,$(CDIO_LIBS) $(CDDB_LIBS))
@@ -156,6 +159,9 @@ ffmpeg.so: $(ffmpeg-objs) $(libcmus-y)
 cue.so: $(cue-objs) $(libcmus-y)
 	$(call cmd,ld_dl,$(CUE_LIBS))
 
+vtx.so: $(vtx-objs) $(libcmus-y)
+	$(call cmd,ld_dl,$(VTX_LIBS))
+
 # }}}
 
 # output plugins {{{
@@ -165,6 +171,7 @@ jack-objs		:= jack.lo
 arts-objs		:= arts.lo
 oss-objs		:= oss.lo mixer_oss.lo
 sun-objs		:= sun.lo mixer_sun.lo
+sndio-objs		:= sndio.lo
 ao-objs			:= ao.lo
 waveout-objs		:= waveout.lo
 roar-objs               := roar.lo
@@ -174,6 +181,7 @@ op-$(CONFIG_ALSA)	+= alsa.so
 op-$(CONFIG_JACK)	+= jack.so
 op-$(CONFIG_ARTS)	+= arts.so
 op-$(CONFIG_OSS)	+= oss.so
+op-$(CONFIG_SNDIO)	+= sndio.so
 op-$(CONFIG_SUN)	+= sun.so
 op-$(CONFIG_AO)		+= ao.so
 op-$(CONFIG_WAVEOUT)	+= waveout.so
@@ -184,6 +192,7 @@ $(alsa-objs): CFLAGS	+= $(ALSA_CFLAGS)
 $(jack-objs): CFLAGS	+= $(JACK_CFLAGS)
 $(arts-objs): CFLAGS	+= $(ARTS_CFLAGS)
 $(oss-objs):  CFLAGS	+= $(OSS_CFLAGS)
+$(sndio-objs): CFLAGS	+= $(SNDIO_CFLAGS)
 $(sun-objs):  CFLAGS	+= $(SUN_CFLAGS)
 $(ao-objs):   CFLAGS	+= $(AO_CFLAGS)
 $(waveout-objs): CFLAGS += $(WAVEOUT_CFLAGS)
@@ -203,6 +212,9 @@ arts.so: $(arts-objs) $(libcmus-y)
 
 oss.so: $(oss-objs) $(libcmus-y)
 	$(call cmd,ld_dl,$(OSS_LIBS))
+
+sndio.so: $(sndio-objs) $(libcmus-y)
+	$(call cmd,ld_dl,$(SNDIO_LIBS))
 
 sun.so: $(sun-objs) $(libcmus-y)
 	$(call cmd,ld_dl,$(SUN_LIBS))
